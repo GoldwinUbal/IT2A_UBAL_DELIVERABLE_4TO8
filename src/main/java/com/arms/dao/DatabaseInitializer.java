@@ -4,6 +4,7 @@ import com.arms.util.PasswordUtil;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
@@ -57,12 +58,12 @@ public class DatabaseInitializer {
 
     private static final String CREATE_ACTIVITY_LOGS = """
             CREATE TABLE IF NOT EXISTS activity_logs (
-                log_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id     INTEGER NOT NULL,
-                action      TEXT NOT NULL,
+                action_type TEXT NOT NULL,
                 description TEXT,
-                timestamp   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(user_id)
+                timestamp   TIMESTAMP DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
             );
             """;
 
@@ -83,6 +84,7 @@ public class DatabaseInitializer {
             stmt.execute(CREATE_UNITS);
             stmt.execute(CREATE_TENANTS);
             stmt.execute(CREATE_PAYMENTS);
+            dropOutdatedActivityLogs(conn);
             stmt.execute(CREATE_ACTIVITY_LOGS);
 
             try (PreparedStatement ps = conn.prepareStatement(MIGRATE_ACTIVE_TO_APPROVED)) {
@@ -101,6 +103,29 @@ public class DatabaseInitializer {
         } catch (SQLException e) {
             System.err.println("[ERROR] Database initialization failed: " + e.getMessage());
             System.exit(1);
+        }
+    }
+
+    /**
+     * Earlier versions created activity_logs with different column names (log_id, action).
+     * That table was never written to, so it is safe to replace it with the new layout.
+     */
+    private void dropOutdatedActivityLogs(Connection conn) throws SQLException {
+        boolean exists = false;
+        boolean hasActionType = false;
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("PRAGMA table_info(activity_logs)")) {
+            while (rs.next()) {
+                exists = true;
+                if ("action_type".equals(rs.getString("name"))) {
+                    hasActionType = true;
+                }
+            }
+        }
+        if (exists && !hasActionType) {
+            try (Statement st = conn.createStatement()) {
+                st.execute("DROP TABLE activity_logs");
+            }
         }
     }
 }

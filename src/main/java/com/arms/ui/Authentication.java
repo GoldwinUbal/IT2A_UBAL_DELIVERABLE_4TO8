@@ -1,5 +1,6 @@
 package com.arms.ui;
 
+import com.arms.dao.ActivityLogDao;
 import com.arms.dao.UserDao;
 import com.arms.model.User;
 import com.arms.util.PasswordUtil;
@@ -14,6 +15,7 @@ public class Authentication {
     private static final String TENANT = "TENANT";
 
     private final UserDao userDao;
+    private final ActivityLogDao logDao = new ActivityLogDao();
     private final Scanner scanner;
 
     public Authentication(UserDao userDao, Scanner scanner) {
@@ -114,7 +116,15 @@ public class Authentication {
         }
 
         System.out.println("Welcome, " + user.username() + "! (" + user.role() + ")");
+        logDao.logAction(user.userId(), "USER_LOGIN",
+                "User " + user.username() + " (ID: " + user.userId() + ") logged in.");
         routeByRole(user);
+        logout(user);
+    }
+
+    private void logout(User user) {
+        logDao.logAction(user.userId(), "USER_LOGOUT",
+                "User " + user.username() + " (ID: " + user.userId() + ") logged out.");
     }
 
     private void routeByRole(User user) {
