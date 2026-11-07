@@ -4,7 +4,6 @@ import com.arms.dao.UserDao;
 import com.arms.model.User;
 import com.arms.util.PasswordUtil;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.Scanner;
 
@@ -109,7 +108,7 @@ public class Authentication {
         }
 
         User user = found.get();
-        if (!"ACTIVE".equals(user.status())) {
+        if (!"APPROVED".equals(user.status())) {
             System.out.println("Your account is " + user.status() + ". Please wait for administrator approval.");
             return;
         }
@@ -120,100 +119,10 @@ public class Authentication {
 
     private void routeByRole(User user) {
         switch (user.role()) {
-            case ADMIN -> adminMenu(user);
-            case MANAGER -> managerMenu(user);
-            case TENANT -> tenantMenu(user);
+            case ADMIN -> new AdminMenu(user, userDao, scanner).show();
+            case MANAGER -> new PropertyManagerMenu(user, scanner).show();
+            case TENANT -> new TenantMenu(user, scanner).show();
             default -> System.out.println("Unknown role: " + user.role());
         }
-    }
-
-    // ------------------------------------------------------------- Role menus
-
-    private void adminMenu(User user) {
-        boolean active = true;
-        while (active) {
-            System.out.println("\n=== ADMINISTRATOR MENU ===");
-            System.out.println("1. View pending users");
-            System.out.println("2. Approve a user");
-            System.out.println("3. Manage apartment/unit records (coming soon)");
-            System.out.println("4. View reports (coming soon)");
-            System.out.println("5. Monitor activity logs (coming soon)");
-            System.out.println("6. Logout");
-            System.out.print("Choose an option: ");
-
-            switch (scanner.nextLine().trim()) {
-                case "1" -> viewPendingUsers();
-                case "2" -> approveUser();
-                case "3", "4", "5" -> System.out.println("Coming soon.");
-                case "6" -> active = false;
-                default -> System.out.println("Invalid option.");
-            }
-        }
-        System.out.println("Logged out.");
-    }
-
-    private void viewPendingUsers() {
-        List<User> pending = userDao.findByStatus("PENDING");
-        if (pending.isEmpty()) {
-            System.out.println("No pending users.");
-            return;
-        }
-        System.out.printf("%-6s %-20s %-18s %-10s%n", "ID", "Username", "Role", "Status");
-        for (User u : pending) {
-            System.out.printf("%-6d %-20s %-18s %-10s%n", u.userId(), u.username(), u.role(), u.status());
-        }
-    }
-
-    private void approveUser() {
-        System.out.print("Enter User ID to approve: ");
-        try {
-            int id = Integer.parseInt(scanner.nextLine().trim());
-            if (userDao.updateStatus(id, "ACTIVE")) {
-                System.out.println("User approved.");
-            } else {
-                System.out.println("User not found.");
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid ID.");
-        }
-    }
-
-    private void managerMenu(User user) {
-        boolean active = true;
-        while (active) {
-            System.out.println("\n=== PROPERTY MANAGER MENU ===");
-            System.out.println("1. Manage tenant records (coming soon)");
-            System.out.println("2. Manage unit assignments (coming soon)");
-            System.out.println("3. Record/update rental payments (coming soon)");
-            System.out.println("4. View rental reports (coming soon)");
-            System.out.println("5. Logout");
-            System.out.print("Choose an option: ");
-
-            switch (scanner.nextLine().trim()) {
-                case "1", "2", "3", "4" -> System.out.println("Coming soon.");
-                case "5" -> active = false;
-                default -> System.out.println("Invalid option.");
-            }
-        }
-        System.out.println("Logged out.");
-    }
-
-    private void tenantMenu(User user) {
-        boolean active = true;
-        while (active) {
-            System.out.println("\n=== TENANT MENU ===");
-            System.out.println("1. View personal information (coming soon)");
-            System.out.println("2. View assigned unit (coming soon)");
-            System.out.println("3. View payment history (coming soon)");
-            System.out.println("4. Logout");
-            System.out.print("Choose an option: ");
-
-            switch (scanner.nextLine().trim()) {
-                case "1", "2", "3" -> System.out.println("Coming soon.");
-                case "4" -> active = false;
-                default -> System.out.println("Invalid option.");
-            }
-        }
-        System.out.println("Logged out.");
     }
 }

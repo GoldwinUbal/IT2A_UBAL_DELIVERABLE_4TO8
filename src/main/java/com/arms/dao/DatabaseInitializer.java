@@ -68,8 +68,12 @@ public class DatabaseInitializer {
 
     private static final String SEED_ADMIN = """
             INSERT OR IGNORE INTO users (username, password, role, status)
-            VALUES (?, ?, 'ADMINISTRATOR', 'ACTIVE');
+            VALUES (?, ?, 'ADMINISTRATOR', 'APPROVED');
             """;
+
+    // Older databases used 'ACTIVE' for approved accounts; the status is now 'APPROVED'.
+    private static final String MIGRATE_ACTIVE_TO_APPROVED =
+            "UPDATE users SET status = ? WHERE status = ?";
 
     public void initialize() {
         try (Connection conn = DatabaseConnection.getConnection();
@@ -80,6 +84,12 @@ public class DatabaseInitializer {
             stmt.execute(CREATE_TENANTS);
             stmt.execute(CREATE_PAYMENTS);
             stmt.execute(CREATE_ACTIVITY_LOGS);
+
+            try (PreparedStatement ps = conn.prepareStatement(MIGRATE_ACTIVE_TO_APPROVED)) {
+                ps.setString(1, "APPROVED");
+                ps.setString(2, "ACTIVE");
+                ps.executeUpdate();
+            }
 
             try (PreparedStatement ps = conn.prepareStatement(SEED_ADMIN)) {
                 ps.setString(1, "admin");

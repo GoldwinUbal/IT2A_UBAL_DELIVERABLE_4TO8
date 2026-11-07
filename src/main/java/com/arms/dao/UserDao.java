@@ -57,16 +57,15 @@ public class UserDao {
         return Optional.empty();
     }
 
-    public List<User> findByStatus(String status) {
+    /** Returns every registered account, regardless of role or status. */
+    public List<User> getAllUsers() {
         List<User> users = new ArrayList<>();
-        String sql = "SELECT user_id, username, password, role, status FROM users WHERE status = ?";
+        String sql = "SELECT user_id, username, password, role, status FROM users ORDER BY user_id";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, status);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    users.add(mapRow(rs));
-                }
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                users.add(mapRow(rs));
             }
         } catch (SQLException e) {
             System.err.println("[ERROR] " + e.getMessage());
@@ -74,12 +73,28 @@ public class UserDao {
         return users;
     }
 
-    public boolean updateStatus(int userId, String status) {
-        String sql = "UPDATE users SET status = ? WHERE user_id = ?";
+    /** Returns all accounts awaiting approval, across every role. */
+    public List<User> getPendingUsers() {
+        List<User> users = new ArrayList<>();
+        String sql = "SELECT user_id, username, password, role, status FROM users WHERE status = 'PENDING' ORDER BY user_id";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                users.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            System.err.println("[ERROR] " + e.getMessage());
+        }
+        return users;
+    }
+
+    /** Changes a PENDING account to APPROVED. Returns true if a row was updated. */
+    public boolean approveUser(int userId) {
+        String sql = "UPDATE users SET status = 'APPROVED' WHERE user_id = ?";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, status);
-            ps.setInt(2, userId);
+            ps.setInt(1, userId);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             System.err.println("[ERROR] " + e.getMessage());
