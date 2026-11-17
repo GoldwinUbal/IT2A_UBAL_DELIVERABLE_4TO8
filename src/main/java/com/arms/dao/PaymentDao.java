@@ -70,6 +70,32 @@ public class PaymentDao {
         return true;
     }
 
+    /** Payments that belong to one tenant, newest first. */
+    public List<Payment> getPaymentsByTenantId(int tenantId) {
+        List<Payment> payments = new ArrayList<>();
+        String sql = "SELECT payment_id, tenant_id, unit_id, amount_paid, payment_date, payment_status, receipt_number "
+                + "FROM payments WHERE tenant_id = ? ORDER BY payment_id DESC";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, tenantId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    payments.add(new Payment(
+                            rs.getInt("payment_id"),
+                            rs.getInt("tenant_id"),
+                            rs.getInt("unit_id"),
+                            rs.getDouble("amount_paid"),
+                            rs.getString("payment_date"),
+                            rs.getString("payment_status"),
+                            rs.getString("receipt_number")));
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[ERROR] " + e.getMessage());
+        }
+        return payments;
+    }
+
     public List<Payment> getAllPayments() {
         List<Payment> payments = new ArrayList<>();
         String sql = "SELECT payment_id, tenant_id, unit_id, amount_paid, payment_date, payment_status, receipt_number "

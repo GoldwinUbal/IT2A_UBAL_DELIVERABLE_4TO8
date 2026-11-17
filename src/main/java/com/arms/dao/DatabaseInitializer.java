@@ -37,6 +37,7 @@ public class DatabaseInitializer {
                 name      TEXT NOT NULL,
                 contact   TEXT,
                 unit_id   INTEGER,
+                status    TEXT NOT NULL DEFAULT 'ACTIVE',
                 FOREIGN KEY (user_id) REFERENCES users(user_id),
                 FOREIGN KEY (unit_id) REFERENCES units(unit_id)
             );
@@ -86,6 +87,7 @@ public class DatabaseInitializer {
             stmt.execute(CREATE_PAYMENTS);
             dropOutdatedActivityLogs(conn);
             stmt.execute(CREATE_ACTIVITY_LOGS);
+            addTenantStatusColumn(conn);
 
             try (PreparedStatement ps = conn.prepareStatement(MIGRATE_ACTIVE_TO_APPROVED)) {
                 ps.setString(1, "APPROVED");
@@ -125,6 +127,26 @@ public class DatabaseInitializer {
         if (exists && !hasActionType) {
             try (Statement st = conn.createStatement()) {
                 st.execute("DROP TABLE activity_logs");
+            }
+        }
+    }
+
+    /** Older databases have no tenants.status column; add it so existing data keeps working. */
+    private void addTenantStatusColumn(Connection conn) throws SQLException {
+        boolean exists = false;
+        boolean hasStatus = false;
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("PRAGMA table_info(tenants)")) {
+            while (rs.next()) {
+                exists = true;
+                if ("status".equals(rs.getString("name"))) {
+                    hasStatus = true;
+                }
+            }
+        }
+        if (exists && !hasStatus) {
+            try (Statement st = conn.createStatement()) {
+                st.execute("ALTER TABLE tenants ADD COLUMN status TEXT NOT NULL DEFAULT 'ACTIVE'");
             }
         }
     }

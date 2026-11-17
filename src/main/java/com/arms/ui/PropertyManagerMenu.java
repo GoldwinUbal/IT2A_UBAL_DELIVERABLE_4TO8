@@ -33,27 +33,89 @@ public class PropertyManagerMenu {
         boolean active = true;
         while (active) {
             System.out.println("\n=== PROPERTY MANAGER MENU ===");
+            System.out.println("1. Manage units");
+            System.out.println("2. Manage tenants");
+            System.out.println("3. Manage payments");
+            System.out.println("4. Logout");
+            System.out.print("Choose an option: ");
+
+            switch (scanner.nextLine().trim()) {
+                case "1" -> unitsMenu();
+                case "2" -> tenantsMenu();
+                case "3" -> paymentsMenu();
+                case "4" -> active = false;
+                default -> System.out.println("Invalid option.");
+            }
+        }
+        System.out.println("Logged out.");
+    }
+
+    // ================================================================ Submenus
+
+    private void unitsMenu() {
+        boolean active = true;
+        while (active) {
+            System.out.println("\n--- Manage Units ---");
             System.out.println("1. Add apartment unit");
             System.out.println("2. View units");
-            System.out.println("3. Create tenant profile and assign unit");
-            System.out.println("4. Record rental payment");
-            System.out.println("5. View payments");
-            System.out.println("6. Update payment status");
-            System.out.println("7. Logout");
+            System.out.println("3. Edit unit information");
+            System.out.println("4. Deactivate unit");
+            System.out.println("5. Reactivate unit");
+            System.out.println("6. Back");
             System.out.print("Choose an option: ");
 
             switch (scanner.nextLine().trim()) {
                 case "1" -> addUnit();
                 case "2" -> printUnits(unitDao.getAllUnits());
-                case "3" -> createTenant();
-                case "4" -> recordPayment();
-                case "5" -> printPayments(paymentDao.getAllPayments());
-                case "6" -> updatePaymentStatus();
-                case "7" -> active = false;
+                case "3" -> editUnit();
+                case "4" -> deactivateUnit();
+                case "5" -> reactivateUnit();
+                case "6" -> active = false;
                 default -> System.out.println("Invalid option.");
             }
         }
-        System.out.println("Logged out.");
+    }
+
+    private void tenantsMenu() {
+        boolean active = true;
+        while (active) {
+            System.out.println("\n--- Manage Tenants ---");
+            System.out.println("1. Create tenant profile and assign unit");
+            System.out.println("2. View tenants");
+            System.out.println("3. Edit tenant information");
+            System.out.println("4. End tenancy (deactivate tenant)");
+            System.out.println("5. Back");
+            System.out.print("Choose an option: ");
+
+            switch (scanner.nextLine().trim()) {
+                case "1" -> createTenant();
+                case "2" -> printTenants(tenantDao.getAllTenantProfiles());
+                case "3" -> editTenant();
+                case "4" -> endTenancy();
+                case "5" -> active = false;
+                default -> System.out.println("Invalid option.");
+            }
+        }
+    }
+
+    private void paymentsMenu() {
+        boolean active = true;
+        while (active) {
+            System.out.println("\n--- Manage Payments ---");
+            System.out.println("1. Record rental payment");
+            System.out.println("2. View payments");
+            System.out.println("3. Update payment status");
+            System.out.println("4. Back");
+            System.out.print("Choose an option: ");
+
+            switch (scanner.nextLine().trim()) {
+                case "1" -> recordPayment();
+                case "2" -> printPayments(paymentDao.getAllPayments());
+                case "3" -> updatePaymentStatus();
+                case "4" -> active = false;
+                default -> System.out.println("Invalid option.");
+            }
+        }
     }
 
     // ------------------------------------------------------------------ Units
@@ -88,12 +150,111 @@ public class PropertyManagerMenu {
         }
     }
 
+    private void editUnit() {
+        System.out.println("\n--- Edit Unit Information ---");
+        List<Unit> units = unitDao.getAllUnits();
+        if (units.isEmpty()) {
+            System.out.println("No units found.");
+            return;
+        }
+        printUnits(units);
+        int id = readIntInput("Enter Unit ID to edit (0 to cancel): ");
+        if (id == 0) {
+            System.out.println("Cancelled.");
+            return;
+        }
+        Unit unit = units.stream().filter(u -> u.unitId() == id).findFirst().orElse(null);
+        if (unit == null) {
+            System.out.println("Unit ID not found.");
+            return;
+        }
+
+        System.out.println("Press Enter to keep the current value.");
+        String number = readKeep("Unit number [" + unit.unitNumber() + "]: ", unit.unitNumber());
+        String type = readKeep("Unit type [" + unit.unitType() + "]: ", unit.unitType());
+        Double rent = readOptionalAmount(String.format("Monthly rent [%.2f]: ", unit.monthlyRent()));
+        double newRent = (rent == null) ? unit.monthlyRent() : rent;
+
+        if (number.equals(unit.unitNumber()) && type.equals(unit.unitType()) && newRent == unit.monthlyRent()) {
+            System.out.println("No changes made.");
+            return;
+        }
+        if (unitDao.updateUnit(manager.userId(), id, number, type, newRent)) {
+            System.out.println("Unit updated.");
+        } else {
+            System.out.println("Could not update unit (the unit number may already exist).");
+        }
+    }
+
+    private void deactivateUnit() {
+        System.out.println("\n--- Deactivate Unit ---");
+        List<Unit> units = unitDao.getAllUnits();
+        if (units.isEmpty()) {
+            System.out.println("No units found.");
+            return;
+        }
+        printUnits(units);
+        int id = readIntInput("Enter Unit ID to deactivate (0 to cancel): ");
+        if (id == 0) {
+            System.out.println("Cancelled.");
+            return;
+        }
+        Unit unit = units.stream().filter(u -> u.unitId() == id).findFirst().orElse(null);
+        if (unit == null) {
+            System.out.println("Unit ID not found.");
+            return;
+        }
+        if ("OCCUPIED".equals(unit.status())) {
+            System.out.println("An occupied unit cannot be deactivated. End the tenancy first.");
+            return;
+        }
+        if ("INACTIVE".equals(unit.status())) {
+            System.out.println("That unit is already inactive.");
+            return;
+        }
+        if (!confirm("Deactivate unit " + unit.unitNumber() + "?")) {
+            System.out.println("Cancelled.");
+            return;
+        }
+        if (unitDao.deactivateUnit(manager.userId(), id)) {
+            System.out.println("Unit " + unit.unitNumber() + " deactivated. The record is kept.");
+        } else {
+            System.out.println("Could not deactivate unit.");
+        }
+    }
+
+    private void reactivateUnit() {
+        System.out.println("\n--- Reactivate Unit ---");
+        List<Unit> inactive = unitDao.getAllUnits().stream()
+                .filter(u -> "INACTIVE".equals(u.status()))
+                .toList();
+        if (inactive.isEmpty()) {
+            System.out.println("There are no inactive units.");
+            return;
+        }
+        printUnits(inactive);
+        int id = readIntInput("Enter Unit ID to reactivate (0 to cancel): ");
+        if (id == 0) {
+            System.out.println("Cancelled.");
+            return;
+        }
+        if (inactive.stream().noneMatch(u -> u.unitId() == id)) {
+            System.out.println("That Unit ID is not in the inactive list.");
+            return;
+        }
+        if (unitDao.reactivateUnit(manager.userId(), id)) {
+            System.out.println("Unit reactivated and is now AVAILABLE.");
+        } else {
+            System.out.println("Could not reactivate unit.");
+        }
+    }
+
     // ---------------------------------------------------------------- Tenants
 
     private void createTenant() {
         System.out.println("\n--- Create Tenant Profile ---");
 
-        List<Integer> taken = tenantDao.getAllTenants().stream().map(Tenant::userId).toList();
+        List<Integer> taken = tenantDao.getAllTenantProfiles().stream().map(Tenant::userId).toList();
         List<User> candidates = userDao.getAllUsers().stream()
                 .filter(u -> "TENANT".equals(u.role()) && "APPROVED".equals(u.status()))
                 .filter(u -> !taken.contains(u.userId()))
@@ -151,19 +312,81 @@ public class PropertyManagerMenu {
         }
     }
 
+    private void editTenant() {
+        System.out.println("\n--- Edit Tenant Information ---");
+        List<Tenant> tenants = tenantDao.getAllTenants();
+        if (tenants.isEmpty()) {
+            System.out.println("There are no active tenants.");
+            return;
+        }
+        printTenants(tenants);
+        int id = readIntInput("Enter Tenant ID to edit (0 to cancel): ");
+        if (id == 0) {
+            System.out.println("Cancelled.");
+            return;
+        }
+        Tenant tenant = tenants.stream().filter(t -> t.tenantId() == id).findFirst().orElse(null);
+        if (tenant == null) {
+            System.out.println("That Tenant ID is not in the active list.");
+            return;
+        }
+
+        String currentContact = tenant.contact() == null ? "" : tenant.contact();
+        System.out.println("Press Enter to keep the current value.");
+        String name = readKeep("Name [" + tenant.name() + "]: ", tenant.name());
+        String contact = readKeep("Contact [" + (currentContact.isEmpty() ? "none" : currentContact) + "]: ",
+                currentContact);
+
+        if (name.equals(tenant.name()) && contact.equals(currentContact)) {
+            System.out.println("No changes made.");
+            return;
+        }
+        if (tenantDao.updateTenant(manager.userId(), id, name, contact)) {
+            System.out.println("Tenant information updated.");
+        } else {
+            System.out.println("Could not update tenant.");
+        }
+    }
+
+    private void endTenancy() {
+        System.out.println("\n--- End Tenancy ---");
+        List<Tenant> tenants = tenantDao.getAllTenants();
+        if (tenants.isEmpty()) {
+            System.out.println("There are no active tenants.");
+            return;
+        }
+        printTenants(tenants);
+        int id = readIntInput("Enter Tenant ID to deactivate (0 to cancel): ");
+        if (id == 0) {
+            System.out.println("Cancelled.");
+            return;
+        }
+        Tenant tenant = tenants.stream().filter(t -> t.tenantId() == id).findFirst().orElse(null);
+        if (tenant == null) {
+            System.out.println("That Tenant ID is not in the active list.");
+            return;
+        }
+        if (!confirm("End the tenancy of " + tenant.name() + "? Their unit will become available.")) {
+            System.out.println("Cancelled.");
+            return;
+        }
+        if (tenantDao.deactivateTenant(manager.userId(), id)) {
+            System.out.println("Tenancy ended. The record and payment history are kept, and the unit is AVAILABLE.");
+        } else {
+            System.out.println("Could not end tenancy.");
+        }
+    }
+
     // --------------------------------------------------------------- Payments
 
     private void recordPayment() {
         System.out.println("\n--- Record Rental Payment ---");
         List<Tenant> tenants = tenantDao.getAllTenants();
         if (tenants.isEmpty()) {
-            System.out.println("No tenants with an assigned unit yet.");
+            System.out.println("No active tenants with an assigned unit yet.");
             return;
         }
-        System.out.printf("%-10s %-20s %-8s%n", "Tenant ID", "Name", "Unit ID");
-        for (Tenant t : tenants) {
-            System.out.printf("%-10d %-20s %-8d%n", t.tenantId(), t.name(), t.unitId());
-        }
+        printTenants(tenants);
 
         int tenantId = readIntInput("Enter Tenant ID (0 to cancel): ");
         if (tenantId == 0) {
@@ -237,6 +460,19 @@ public class PropertyManagerMenu {
         }
     }
 
+    private void printTenants(List<Tenant> tenants) {
+        if (tenants.isEmpty()) {
+            System.out.println("No tenants found.");
+            return;
+        }
+        System.out.printf("%-10s %-20s %-16s %-8s %-9s%n", "Tenant ID", "Name", "Contact", "Unit ID", "Status");
+        for (Tenant t : tenants) {
+            String contact = (t.contact() == null || t.contact().isBlank()) ? "N/A" : t.contact();
+            System.out.printf("%-10d %-20s %-16s %-8d %-9s%n",
+                    t.tenantId(), t.name(), contact, t.unitId(), t.status());
+        }
+    }
+
     private void printPayments(List<Payment> payments) {
         if (payments.isEmpty()) {
             System.out.println("No payments recorded yet.");
@@ -282,6 +518,39 @@ public class PropertyManagerMenu {
                 System.out.println("Invalid input. Please enter a number.");
             }
         }
+    }
+
+    /** Returns a positive amount, or null if the user just presses Enter (keep current). */
+    private Double readOptionalAmount(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String input = scanner.nextLine().trim();
+            if (input.isEmpty()) {
+                return null;
+            }
+            try {
+                double value = Double.parseDouble(input);
+                if (value <= 0 || Double.isNaN(value) || Double.isInfinite(value)) {
+                    System.out.println("Amount must be a positive number.");
+                    continue;
+                }
+                return value;
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid input. Please enter a number.");
+            }
+        }
+    }
+
+    /** Returns the typed text, or the current value if the user just presses Enter. */
+    private String readKeep(String prompt, String current) {
+        System.out.print(prompt);
+        String input = scanner.nextLine().trim();
+        return input.isEmpty() ? current : input;
+    }
+
+    private boolean confirm(String question) {
+        System.out.print(question + " Type YES to confirm: ");
+        return scanner.nextLine().trim().equalsIgnoreCase("YES");
     }
 
     private String readValidPaymentStatus() {
